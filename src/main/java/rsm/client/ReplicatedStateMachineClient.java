@@ -1,12 +1,12 @@
 package rsm.client;
 
+import io.aeron.ChannelUriStringBuilder;
 import io.aeron.cluster.client.AeronCluster;
 import io.aeron.cluster.client.EgressListener;
+import io.aeron.cluster.codecs.EventCode;
 import io.aeron.driver.MediaDriver;
 import io.aeron.driver.ThreadingMode;
 import io.aeron.logbuffer.Header;
-import io.aeron.samples.cluster.ClusterConfig;
-import rsm.node.MessageType;
 import org.agrona.BitUtil;
 import org.agrona.DirectBuffer;
 import org.agrona.ExpandableDirectByteBuffer;
@@ -15,46 +15,61 @@ import org.agrona.concurrent.IdleStrategy;
 import org.agrona.concurrent.SleepingMillisIdleStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import rsm.common.ClusterNodeConfig;
+import rsm.node.MessageType;
 
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.LockSupport;
 
+import static io.aeron.CommonContext.UDP_MEDIA;
 import static org.awaitility.Awaitility.await;
 
 public class ReplicatedStateMachineClient implements EgressListener {
 
     private static final Logger log = LoggerFactory.getLogger(ReplicatedStateMachineClient.class);
-    public static final int CLIENT_FACING_OFFSET = 10;
 
-    private final int port;
     private final List<String> clusterNodeHostnames;
     private MediaDriver mediaDriver;
     private AeronCluster clusterClient;
     private final IdleStrategy idleStrategy = new SleepingMillisIdleStrategy();
     private final AtomicLong lastReceivedCorrelationId = new AtomicLong(0L);
     private final AtomicLong lastReceivedValue = new AtomicLong(0L);
+    private final ExecutorService executor = Executors.newCachedThreadPool();
 
-    public ReplicatedStateMachineClient(final List<String> clusterNodeHostnames, final int port) {
+    public ReplicatedStateMachineClient(final List<String> clusterNodeHostnames) {
         this.clusterNodeHostnames = clusterNodeHostnames;
-        this.port = port;
     }
 
     public void start() {
-        final String ingressEndpoints = ingressEndpoints(clusterNodeHostnames);
+        final String ingressEndpoints = ClusterNodeConfig.ingressEndpoints(clusterNodeHostnames);
 
         this.mediaDriver = MediaDriver.launchEmbedded(new MediaDriver.Context()
+                .errorHandler(Throwable::printStackTrace)
                 .threadingMode(ThreadingMode.SHARED)
                 .dirDeleteOnStart(true)
                 .dirDeleteOnShutdown(true));
 
+        final String egressChannel = new ChannelUriStringBuilder()
+                .media(UDP_MEDIA)
+                .endpoint("localhost" + ":" + 19001)
+                .build();
+
         this.clusterClient = AeronCluster.connect(
                 new AeronCluster.Context()
+                        .messageTimeoutNs(TimeUnit.MINUTES.toNanos(1))
                         .egressListener(this)
-                        .egressChannel("aeron:udp?endpoint=localhost:0")
+                        .egressChannel(egressChannel)
                         .aeronDirectoryName(mediaDriver.aeronDirectoryName())
-                        .ingressChannel("aeron:udp")
                         .ingressEndpoints(ingressEndpoints));
+
+        await().until(() -> clusterClient.egressSubscription().isConnected());
+
+        this.executor.submit(new ThrottledPollerJob(clusterClient::pollEgress, 10L));
+        this.executor.submit(new ThrottledPollerJob(clusterClient::sendKeepAlive, 1_000_000L));
     }
 
     public void stop() {
@@ -118,6 +133,21 @@ public class ReplicatedStateMachineClient implements EgressListener {
         lastReceivedValue.set(value);
     }
 
+    @Override
+    public void onSessionEvent(final long correlationId,
+                               final long clusterSessionId,
+                               final long leadershipTermId,
+                               final int leaderMemberId,
+                               final EventCode code,
+                               final String detail) {
+        log.info("Received session event with code: {}", code);
+    }
+
+    @Override
+    public void onNewLeader(final long clusterSessionId, final long leadershipTermId, final int leaderMemberId, final String ingressEndpoints) {
+        log.info("Received onNewLeader event. New leader: {}", leaderMemberId);
+    }
+
     private void offer(final MutableDirectBuffer buffer, final int length)
     {
         long result;
@@ -128,25 +158,34 @@ public class ReplicatedStateMachineClient implements EgressListener {
             {
                 log.info("Potentially unexpected offer result on client side: {}", result);
             }
+            idleStrategy.idle((int) result);
+            clusterClient.pollEgress();
         }
         while (result < 0);
+
+        log.info("Offered. Result: {}", result);
     }
 
-    private String ingressEndpoints(final List<String> hostnames)
+    private final class ThrottledPollerJob implements Runnable
     {
-        final StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < hostnames.size(); i++)
+
+        private final Runnable runnable;
+        private final long sleepNanos;
+
+        public ThrottledPollerJob(final Runnable runnable, final long sleepNanos)
         {
-            sb.append(i).append('=');
-            sb.append(hostnames.get(i)).append(':').append(calculatePort(i));
-            sb.append(',');
+            this.runnable = runnable;
+            this.sleepNanos = sleepNanos;
         }
 
-        sb.setLength(sb.length() - 1);
-        return sb.toString();
-    }
-
-    private int calculatePort(final int nodeId) {
-        return port + (nodeId * ClusterConfig.PORTS_PER_NODE) + CLIENT_FACING_OFFSET;
+        @Override
+        public void run()
+        {
+            while (!clusterClient.isClosed())
+            {
+                runnable.run();
+                LockSupport.parkNanos(sleepNanos);
+            }
+        }
     }
 }

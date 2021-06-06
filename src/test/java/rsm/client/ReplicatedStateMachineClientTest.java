@@ -1,9 +1,9 @@
 package rsm.client;
 
-import io.aeron.samples.cluster.ClusterConfig;
+import org.junit.jupiter.api.Test;
+import rsm.common.ClusterNodeConfig;
 import rsm.node.ReplicatedStateMachineClusterNode;
 import rsm.node.ReplicatedStateMachineClusteredService;
-import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
 import java.util.List;
@@ -13,11 +13,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class ReplicatedStateMachineClientTest {
 
-    private static final Supplier<ClusterConfig> SINGLE_NODE_CONFIG = () -> ClusterConfig.create(
+    private static final Supplier<ClusterNodeConfig> SINGLE_NODE_CONFIG = () -> ClusterNodeConfig.create(
             0,
             Collections.singletonList("localhost"),
-            Collections.singletonList("localhost"),
-            9000,
             new ReplicatedStateMachineClusteredService());
 
     public static final String LOCALHOST = "localhost";
@@ -25,7 +23,7 @@ public class ReplicatedStateMachineClientTest {
     @Test
     void shouldStartAndStopTheClientAndNode() {
         final ReplicatedStateMachineClusterNode clusterNode = new ReplicatedStateMachineClusterNode(SINGLE_NODE_CONFIG.get());
-        final ReplicatedStateMachineClient client = new ReplicatedStateMachineClient(List.of(LOCALHOST), 9000);
+        final ReplicatedStateMachineClient client = new ReplicatedStateMachineClient(List.of(LOCALHOST));
 
         clusterNode.start();
         client.start();
@@ -37,7 +35,7 @@ public class ReplicatedStateMachineClientTest {
     @Test
     void shouldGetZeroInitialValue() {
         final ReplicatedStateMachineClusterNode clusterNode = new ReplicatedStateMachineClusterNode(SINGLE_NODE_CONFIG.get());
-        final ReplicatedStateMachineClient client = new ReplicatedStateMachineClient(List.of(LOCALHOST), 9000);
+        final ReplicatedStateMachineClient client = new ReplicatedStateMachineClient(List.of(LOCALHOST));
 
         clusterNode.start();
         client.start();
@@ -53,7 +51,7 @@ public class ReplicatedStateMachineClientTest {
     @Test
     void shouldSetAndGetValue() {
         final ReplicatedStateMachineClusterNode clusterNode = new ReplicatedStateMachineClusterNode(SINGLE_NODE_CONFIG.get());
-        final ReplicatedStateMachineClient client = new ReplicatedStateMachineClient(List.of(LOCALHOST), 9000);
+        final ReplicatedStateMachineClient client = new ReplicatedStateMachineClient(List.of(LOCALHOST));
 
         clusterNode.start();
         client.start();

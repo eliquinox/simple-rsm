@@ -2,6 +2,7 @@ package rsm.node;
 
 import io.aeron.ExclusivePublication;
 import io.aeron.Image;
+import io.aeron.cluster.client.ClusterException;
 import io.aeron.cluster.codecs.CloseReason;
 import io.aeron.cluster.service.ClientSession;
 import io.aeron.cluster.service.Cluster;
@@ -13,6 +14,8 @@ import org.agrona.ExpandableArrayBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.TimeUnit;
 
 public class ReplicatedStateMachineClusteredService implements ClusteredService {
 
@@ -31,11 +34,12 @@ public class ReplicatedStateMachineClusteredService implements ClusteredService 
 
     @Override
     public void onSessionOpen(final ClientSession session, final long timestamp) {
+        log.info("Session {} opened at {}", session.id(), timestamp);
     }
 
     @Override
     public void onSessionClose(final ClientSession session, final long timestamp, final CloseReason closeReason) {
-
+        log.info("Session {} closed at {} of {}", session.id(), timestamp, closeReason);
     }
 
     @Override
@@ -49,7 +53,7 @@ public class ReplicatedStateMachineClusteredService implements ClusteredService 
         final long correlationId = buffer.getLong(offset);
         final MessageType messageType = MessageType.fromCode(buffer.getChar(offset + MESSAGE_TYPE_POSITION));
 
-        log.info("Received request with correlation ID: {} and type: {}", correlationId, messageType);
+        log.info("Cluster node {} received request with correlation ID: {} and type: {}", cluster.memberId(), correlationId, messageType);
 
         switch (messageType)
         {
@@ -80,16 +84,20 @@ public class ReplicatedStateMachineClusteredService implements ClusteredService 
 
     @Override
     public void onRoleChange(final Cluster.Role newRole) {
-
+        log.info("Cluster node {} has a new role: {}", cluster.memberId(), newRole);
     }
 
     @Override
     public void onTerminate(final Cluster cluster) {
-
+        log.info("Cluster node {} is in onTermination. It's role is {}", cluster.memberId(), cluster.role());
     }
 
     public Cluster.Role getRole()
     {
-        return cluster != null ? cluster.role() : Cluster.Role.FOLLOWER;
+        return cluster.role();
+    }
+
+    public int getMemberId() {
+        return cluster.memberId();
     }
 }

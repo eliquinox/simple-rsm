@@ -10,7 +10,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.aeron:aeron-all:1.33.1")
+    implementation("io.aeron:aeron-all:1.31.1")
     implementation("org.agrona:agrona:1.10.0")
     implementation("org.awaitility:awaitility:4.0.3")
     implementation("ch.qos.logback:logback-classic:1.2.3")

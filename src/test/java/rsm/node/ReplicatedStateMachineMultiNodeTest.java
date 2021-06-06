@@ -1,66 +1,83 @@
 package rsm.node;
 
 import io.aeron.cluster.ClusterTool;
-import org.agrona.collections.MutableReference;
-import rsm.client.ReplicatedStateMachineClient;
 import io.aeron.cluster.service.Cluster;
-import io.aeron.samples.cluster.ClusterConfig;
+import org.agrona.collections.MutableReference;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import rsm.client.ReplicatedStateMachineClient;
+import rsm.common.ClusterNodeConfig;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.LockSupport;
-import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
 
 public class ReplicatedStateMachineMultiNodeTest {
 
     public static final String LOCALHOST = "localhost";
-    public static final int PORT_BASE = 9000;
+    private ReplicatedStateMachineClusterNode node1;
+    private ReplicatedStateMachineClusterNode node2;
+    private ReplicatedStateMachineClusterNode node3;
+    private ReplicatedStateMachineClusterNode node4;
+    public static final List<String> CLUSTER_NODE_HOSTNAMES = List.of(LOCALHOST, LOCALHOST, LOCALHOST, LOCALHOST);
+    private ReplicatedStateMachineClient client;
 
-    @Test
-    void shouldOperateMultiNodeCluster() {
-        final List<String> clusterNodeHostnames = List.of(LOCALHOST, LOCALHOST, LOCALHOST);
-        final ClusterConfig node1Config = ClusterConfig.create(
+    @BeforeEach
+    void setUp() {
+        final ClusterNodeConfig node1Config = ClusterNodeConfig.create(
                 0,
-                clusterNodeHostnames,
-                clusterNodeHostnames,
-                PORT_BASE,
+                CLUSTER_NODE_HOSTNAMES,
                 new ReplicatedStateMachineClusteredService());
 
-        final ClusterConfig node2Config = ClusterConfig.create(
+        final ClusterNodeConfig node2Config = ClusterNodeConfig.create(
                 1,
-                clusterNodeHostnames,
-                clusterNodeHostnames,
-                PORT_BASE,
+                CLUSTER_NODE_HOSTNAMES,
                 new ReplicatedStateMachineClusteredService());
 
-        final ClusterConfig node3Config = ClusterConfig.create(
+        final ClusterNodeConfig node3Config = ClusterNodeConfig.create(
                 2,
-                clusterNodeHostnames,
-                clusterNodeHostnames,
-                PORT_BASE,
+                CLUSTER_NODE_HOSTNAMES,
                 new ReplicatedStateMachineClusteredService());
 
-        final ReplicatedStateMachineClusterNode node1 = new ReplicatedStateMachineClusterNode(node1Config);
-        final ReplicatedStateMachineClusterNode node2 = new ReplicatedStateMachineClusterNode(node2Config);
-        final ReplicatedStateMachineClusterNode node3 = new ReplicatedStateMachineClusterNode(node3Config);
+        final ClusterNodeConfig node4Config = ClusterNodeConfig.create(
+                3,
+                CLUSTER_NODE_HOSTNAMES,
+                new ReplicatedStateMachineClusteredService());
+
+        node1 = new ReplicatedStateMachineClusterNode(node1Config);
+        node2 = new ReplicatedStateMachineClusterNode(node2Config);
+        node3 = new ReplicatedStateMachineClusterNode(node3Config);
+        node4 = new ReplicatedStateMachineClusterNode(node4Config);
 
         node1.start();
         node2.start();
         node3.start();
+        node4.start();
 
-        awaitLeader(node1, node2, node3);
+        awaitLeader(node1, node2, node3, node4);
 
-        final ReplicatedStateMachineClient client = new ReplicatedStateMachineClient(clusterNodeHostnames, PORT_BASE);
-
+        client = new ReplicatedStateMachineClient(CLUSTER_NODE_HOSTNAMES);
         client.start();
+    }
 
+    @AfterEach
+    void tearDown() {
+        node1.stop();
+        node2.stop();
+        node3.stop();
+        node4.stop();
+
+        client.stop();
+    }
+
+    @Test
+    void shouldOperateMultiNodeCluster() {
         client.setValue(101L);
 
         final long actualValue = client.getValue();
@@ -69,63 +86,20 @@ public class ReplicatedStateMachineMultiNodeTest {
     }
 
     @Test
-    void shouldContinueToOperateAfterLeaderIsStopped() {
-        final List<String> clusterNodeHostnames = List.of(LOCALHOST, LOCALHOST, LOCALHOST, LOCALHOST);
-        final ClusterConfig node1Config = ClusterConfig.create(
-                0,
-                clusterNodeHostnames,
-                clusterNodeHostnames,
-                PORT_BASE,
-                new ReplicatedStateMachineClusteredService());
-
-        final ClusterConfig node2Config = ClusterConfig.create(
-                1,
-                clusterNodeHostnames,
-                clusterNodeHostnames,
-                PORT_BASE,
-                new ReplicatedStateMachineClusteredService());
-
-        final ClusterConfig node3Config = ClusterConfig.create(
-                2,
-                clusterNodeHostnames,
-                clusterNodeHostnames,
-                PORT_BASE,
-                new ReplicatedStateMachineClusteredService());
-
-        final ClusterConfig node4Config = ClusterConfig.create(
-                3,
-                clusterNodeHostnames,
-                clusterNodeHostnames,
-                PORT_BASE,
-                new ReplicatedStateMachineClusteredService());
-
-        final ReplicatedStateMachineClusterNode node1 = new ReplicatedStateMachineClusterNode(node1Config);
-        final ReplicatedStateMachineClusterNode node2 = new ReplicatedStateMachineClusterNode(node2Config);
-        final ReplicatedStateMachineClusterNode node3 = new ReplicatedStateMachineClusterNode(node3Config);
-        final ReplicatedStateMachineClusterNode node4 = new ReplicatedStateMachineClusterNode(node4Config);
-
-        node1.start();
-        node2.start();
-        node3.start();
-        node4.start();
-
-        final ReplicatedStateMachineClusterNode leader = awaitLeader(node1, node2, node3, node4);
-
-
-        final ReplicatedStateMachineClient client = new ReplicatedStateMachineClient(clusterNodeHostnames, PORT_BASE);
-        client.start();
-
+    void shouldContinueToOperateAfterLeaderIsRemoved() {
         client.setValue(101L);
 
         final long actualValue = client.getValue();
 
         assertEquals(101L, actualValue);
 
-        leader.stop();
+        final ReplicatedStateMachineClusterNode leader = awaitLeader(node1, node2, node3, node4);
 
-        final ReplicatedStateMachineClusterNode newLeader = awaitLeader(node1, node2, node3, node4);
+        ClusterTool.removeMember(leader.getClusterDir(), leader.getClusterMemberId(), false);
 
-        assertNotSame(leader, newLeader);
+        awaitLeader(Stream.of(node1, node2, node3, node4)
+                .filter(node -> node != leader)
+                .toArray(ReplicatedStateMachineClusterNode[]::new));
 
         client.setValue(102L);
 
@@ -141,6 +115,8 @@ public class ReplicatedStateMachineMultiNodeTest {
                 .pollDelay(1, TimeUnit.SECONDS)
                 .then()
                 .until(() -> {
+                    System.out.println("Current cluster role view: " + Arrays.stream(clusterNodes).map(ReplicatedStateMachineClusterNode::getRole).toList());
+
                     final Optional<ReplicatedStateMachineClusterNode> maybeLeader = Arrays.stream(clusterNodes)
                             .filter(node -> node.getRole() == Cluster.Role.LEADER)
                             .findFirst();
