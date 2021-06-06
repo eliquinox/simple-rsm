@@ -116,34 +116,6 @@ public class ClusterNodeConfig
     }
 
     /**
-     * Set the same error handler for all contexts.
-     *
-     * @param errorHandler to receive errors.
-     */
-    public void errorHandler(final ErrorHandler errorHandler)
-    {
-        this.mediaDriverContext.errorHandler(errorHandler);
-        this.archiveContext.errorHandler(errorHandler);
-        this.aeronArchiveContext.errorHandler(errorHandler);
-        this.consensusModuleContext.errorHandler(errorHandler);
-        this.clusteredServiceContext.errorHandler(errorHandler);
-    }
-
-    /**
-     * Set the aeron directory for all configuration contexts.
-     *
-     * @param aeronDir directory to use for aeron.
-     */
-    public void aeronDirectoryName(final String aeronDir)
-    {
-        this.mediaDriverContext.aeronDirectoryName(aeronDir);
-        this.archiveContext.aeronDirectoryName(aeronDir);
-        this.aeronArchiveContext.aeronDirectoryName(aeronDir);
-        this.consensusModuleContext.aeronDirectoryName(aeronDir);
-        this.clusteredServiceContext.aeronDirectoryName(aeronDir);
-    }
-
-    /**
      * Gets the configuration's media driver context.
      *
      * @return configured {@link io.aeron.driver.MediaDriver.Context}.
