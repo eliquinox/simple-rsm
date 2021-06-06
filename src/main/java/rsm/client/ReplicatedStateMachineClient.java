@@ -48,6 +48,7 @@ public class ReplicatedStateMachineClient implements EgressListener {
         final String ingressEndpoints = ClusterNodeConfig.ingressEndpoints(clusterNodeHostnames);
 
         this.mediaDriver = MediaDriver.launchEmbedded(new MediaDriver.Context()
+                .aeronDirectoryName(ClusterNodeConfig.shmDirForName("rsm-client"))
                 .errorHandler(Throwable::printStackTrace)
                 .threadingMode(ThreadingMode.SHARED)
                 .dirDeleteOnStart(true)
