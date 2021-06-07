@@ -1,7 +1,6 @@
 package rsm.common;
 
 import io.aeron.ChannelUriStringBuilder;
-import io.aeron.CommonContext;
 import io.aeron.archive.Archive;
 import io.aeron.archive.ArchiveThreadingMode;
 import io.aeron.archive.client.AeronArchive;
@@ -11,8 +10,6 @@ import io.aeron.cluster.service.ClusteredServiceContainer;
 import io.aeron.driver.MediaDriver;
 import io.aeron.driver.MinMulticastFlowControlSupplier;
 import io.aeron.driver.ThreadingMode;
-import org.agrona.ErrorHandler;
-import org.agrona.IoUtil;
 import org.agrona.concurrent.NoOpLock;
 
 import java.io.File;
