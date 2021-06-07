@@ -1,5 +1,8 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+
 plugins {
     java
+    id("com.github.johnrengelman.shadow") version "6.1.0"
 }
 
 group = "org.example"
@@ -7,6 +10,12 @@ version = "1.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
+}
+
+configurations {
+    implementation {
+        isCanBeResolved = true
+    }
 }
 
 dependencies {
@@ -20,4 +29,26 @@ dependencies {
 
 tasks.getByName<Test>("test") {
     useJUnitPlatform()
+}
+
+tasks {
+    register<ShadowJar>("rsmClient") {
+        destinationDirectory.set(buildDir)
+        archiveFileName.set("rsm-client.jar")
+        manifest {
+            attributes["Main-Class"] = "rsm.client.ReplicationStateMachineMain"
+        }
+        from(sourceSets.main.get().output)
+        from(project.configurations.implementation)
+    }
+
+    register<ShadowJar>("rsmNode") {
+        destinationDirectory.set(buildDir)
+        archiveFileName.set("rsm-node.jar")
+        manifest {
+            attributes["Main-Class"] = "rsm.node.ReplicatedStateMachineClusterNodeMain"
+        }
+        from(sourceSets.main.get().output)
+        from(project.configurations.implementation)
+    }
 }
