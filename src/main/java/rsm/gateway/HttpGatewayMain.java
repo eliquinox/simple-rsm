@@ -11,10 +11,11 @@ import static spark.route.HttpMethod.get;
 public class HttpGatewayMain {
 
     public static void main(String[] args) {
-        final String topologyConfigFile = args[0];
+        final String clientHostName = args[0];
+        final String topologyConfigFile = args[1];
         final ClusterTopologyConfiguration topologyConfig = ClusterTopologyConfiguration.fromYaml(topologyConfigFile);
 
-        final ReplicatedStateMachineClient client = new ReplicatedStateMachineClient(topologyConfig.getNodeHostnames());
+        final ReplicatedStateMachineClient client = new ReplicatedStateMachineClient(clientHostName, topologyConfig.getNodeHostnames());
 
         log.info("Starting client using topology configuration {}", topologyConfigFile);
 

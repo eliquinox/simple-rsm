@@ -44,7 +44,7 @@ public class HttpGatewayTest {
         clusterNode = new ReplicatedStateMachineClusterNode(SINGLE_NODE_CONFIG.get());
         clusterNode.start();
 
-        httpGateway = new HttpGateway(new ReplicatedStateMachineClient(List.of(LOCALHOST)));
+        httpGateway = new HttpGateway(new ReplicatedStateMachineClient(LOCALHOST, List.of(LOCALHOST)));
         httpGateway.start();
     }
 

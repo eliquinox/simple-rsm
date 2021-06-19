@@ -62,7 +62,7 @@ public class ReplicatedStateMachineMultiNodeTest {
 
         awaitLeader(node1, node2, node3, node4);
 
-        client = new ReplicatedStateMachineClient(CLUSTER_NODE_HOSTNAMES);
+        client = new ReplicatedStateMachineClient(LOCALHOST, CLUSTER_NODE_HOSTNAMES);
         client.start();
     }
 

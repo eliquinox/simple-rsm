@@ -23,7 +23,7 @@ public class ReplicatedStateMachineClientTest {
     @Test
     void shouldStartAndStopTheClientAndNode() {
         final ReplicatedStateMachineClusterNode clusterNode = new ReplicatedStateMachineClusterNode(SINGLE_NODE_CONFIG.get());
-        final ReplicatedStateMachineClient client = new ReplicatedStateMachineClient(List.of(LOCALHOST));
+        final ReplicatedStateMachineClient client = new ReplicatedStateMachineClient(LOCALHOST, List.of(LOCALHOST));
 
         clusterNode.start();
         client.start();
@@ -35,7 +35,7 @@ public class ReplicatedStateMachineClientTest {
     @Test
     void shouldGetZeroInitialValue() {
         final ReplicatedStateMachineClusterNode clusterNode = new ReplicatedStateMachineClusterNode(SINGLE_NODE_CONFIG.get());
-        final ReplicatedStateMachineClient client = new ReplicatedStateMachineClient(List.of(LOCALHOST));
+        final ReplicatedStateMachineClient client = new ReplicatedStateMachineClient(LOCALHOST, List.of(LOCALHOST));
 
         clusterNode.start();
         client.start();
@@ -51,7 +51,7 @@ public class ReplicatedStateMachineClientTest {
     @Test
     void shouldSetAndGetValue() {
         final ReplicatedStateMachineClusterNode clusterNode = new ReplicatedStateMachineClusterNode(SINGLE_NODE_CONFIG.get());
-        final ReplicatedStateMachineClient client = new ReplicatedStateMachineClient(List.of(LOCALHOST));
+        final ReplicatedStateMachineClient client = new ReplicatedStateMachineClient(LOCALHOST, List.of(LOCALHOST));
 
         clusterNode.start();
         client.start();

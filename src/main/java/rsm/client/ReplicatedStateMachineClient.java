@@ -41,8 +41,10 @@ public class ReplicatedStateMachineClient implements EgressListener {
     private final AtomicLong lastReceivedValue = new AtomicLong(0L);
     private final AtomicInteger lastReplyingNodeId = new AtomicInteger(-1);
     private final ExecutorService executor = Executors.newCachedThreadPool();
+    private final String clientHostName;
 
-    public ReplicatedStateMachineClient(final List<String> clusterNodeHostnames) {
+    public ReplicatedStateMachineClient(final String clientHostName, final List<String> clusterNodeHostnames) {
+        this.clientHostName = clientHostName;
         this.clusterNodeHostnames = clusterNodeHostnames;
     }
 
@@ -58,8 +60,7 @@ public class ReplicatedStateMachineClient implements EgressListener {
 
         final String egressChannel = new ChannelUriStringBuilder()
                 .media(UDP_MEDIA)
-                // TODO: parametrise client hostname
-                .endpoint("localhost" + ":" + 19001)
+                .endpoint(clientHostName + ":" + 19001)
                 .build();
 
         this.clusterClient = AeronCluster.connect(
