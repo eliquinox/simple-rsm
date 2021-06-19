@@ -68,6 +68,7 @@ public class ReplicatedStateMachineClusteredService implements ClusteredService 
 
         responseBuffer.putLong(0, correlationId);
         responseBuffer.putLong(BitUtil.SIZE_OF_LONG, replicatedStateMachine.getValue());
+        responseBuffer.putInt(BitUtil.SIZE_OF_LONG * 2, cluster.memberId());
 
         session.offer(responseBuffer, 0, responseBuffer.capacity());
     }

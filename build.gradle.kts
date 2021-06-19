@@ -27,6 +27,7 @@ dependencies {
     implementation("ch.qos.logback:logback-classic:1.2.3")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.11.2")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.11.2")
+    implementation("com.sparkjava:spark-core:2.9.3")
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.6.0")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
 }

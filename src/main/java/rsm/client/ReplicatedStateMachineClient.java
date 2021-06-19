@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.LockSupport;
 
@@ -38,6 +39,7 @@ public class ReplicatedStateMachineClient implements EgressListener {
     private final IdleStrategy idleStrategy = new SleepingMillisIdleStrategy();
     private final AtomicLong lastReceivedCorrelationId = new AtomicLong(0L);
     private final AtomicLong lastReceivedValue = new AtomicLong(0L);
+    private final AtomicInteger lastReplyingNodeId = new AtomicInteger(-1);
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
     public ReplicatedStateMachineClient(final List<String> clusterNodeHostnames) {
@@ -56,12 +58,13 @@ public class ReplicatedStateMachineClient implements EgressListener {
 
         final String egressChannel = new ChannelUriStringBuilder()
                 .media(UDP_MEDIA)
+                // TODO: parametrise client hostname
                 .endpoint("localhost" + ":" + 19001)
                 .build();
 
         this.clusterClient = AeronCluster.connect(
                 new AeronCluster.Context()
-                        .messageTimeoutNs(TimeUnit.MINUTES.toNanos(1))
+                        .messageTimeoutNs(TimeUnit.SECONDS.toNanos(30))
                         .egressListener(this)
                         .egressChannel(egressChannel)
                         .aeronDirectoryName(mediaDriver.aeronDirectoryName())
@@ -127,11 +130,13 @@ public class ReplicatedStateMachineClient implements EgressListener {
 
         final long correlationId = buffer.getLong(offset);
         final long value = buffer.getLong(offset + BitUtil.SIZE_OF_LONG);
+        final int nodeId = buffer.getInt(offset + BitUtil.SIZE_OF_LONG * 2);
 
         log.info("Received message with correlation ID: {} and value: {}", correlationId, value);
 
         lastReceivedCorrelationId.set(correlationId);
         lastReceivedValue.set(value);
+        lastReplyingNodeId.set(nodeId);
     }
 
     @Override
@@ -165,6 +170,10 @@ public class ReplicatedStateMachineClient implements EgressListener {
         while (result < 0);
 
         log.info("Offered. Result: {}", result);
+    }
+
+    public int getLastReplyingNodeId() {
+        return lastReplyingNodeId.get();
     }
 
     private final class ThrottledPollerJob implements Runnable

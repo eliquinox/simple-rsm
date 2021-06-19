@@ -1,13 +1,14 @@
-package rsm.client;
+package rsm.gateway;
 
+import lombok.extern.slf4j.Slf4j;
 import org.agrona.concurrent.SigInt;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import rsm.client.ReplicatedStateMachineClient;
 import rsm.common.ClusterTopologyConfiguration;
 
-public class ReplicatedStateMachineClientMain {
+import static spark.route.HttpMethod.get;
 
-    private static final Logger log = LoggerFactory.getLogger(ReplicatedStateMachineClientMain.class);
+@Slf4j
+public class HttpGatewayMain {
 
     public static void main(String[] args) {
         final String topologyConfigFile = args[0];
@@ -17,16 +18,14 @@ public class ReplicatedStateMachineClientMain {
 
         log.info("Starting client using topology configuration {}", topologyConfigFile);
 
-        client.start();
+        final HttpGateway httpGateway = new HttpGateway(client);
 
-        log.info("Client started");
+        httpGateway.start();
 
-        client.setValue(100);
 
-        final long value = client.getValue();
-
-        log.info("Set value to {}", value);
-
-        SigInt.register(client::stop);
+        SigInt.register(() -> {
+            httpGateway.close();
+            client.stop();
+        });
     }
 }
