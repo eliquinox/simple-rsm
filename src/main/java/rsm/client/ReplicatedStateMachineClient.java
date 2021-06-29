@@ -19,12 +19,11 @@ import rsm.common.ClusterNodeConfig;
 import rsm.node.MessageType;
 
 import java.util.List;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.LockSupport;
 
 import static io.aeron.CommonContext.UDP_MEDIA;
 import static org.awaitility.Awaitility.await;
@@ -40,7 +39,7 @@ public class ReplicatedStateMachineClient implements EgressListener {
     private final AtomicLong lastReceivedCorrelationId = new AtomicLong(0L);
     private final AtomicLong lastReceivedValue = new AtomicLong(0L);
     private final AtomicInteger lastReplyingNodeId = new AtomicInteger(-1);
-    private final ExecutorService executor = Executors.newCachedThreadPool();
+    private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
     private final String clientHostName;
 
     public ReplicatedStateMachineClient(final String clientHostName, final List<String> clusterNodeHostnames) {
@@ -73,8 +72,8 @@ public class ReplicatedStateMachineClient implements EgressListener {
 
         await().until(() -> clusterClient.egressSubscription().isConnected());
 
-        this.executor.submit(new ThrottledPollerJob(clusterClient::pollEgress, 10L));
-        this.executor.submit(new ThrottledPollerJob(clusterClient::sendKeepAlive, 1_000_000L));
+        this.executor.scheduleAtFixedRate(clusterClient::pollEgress, 0L, 10L, TimeUnit.NANOSECONDS);
+        this.executor.scheduleAtFixedRate(clusterClient::sendKeepAlive, 0L, 1_000_000L, TimeUnit.NANOSECONDS);
     }
 
     public void stop() {
@@ -175,28 +174,5 @@ public class ReplicatedStateMachineClient implements EgressListener {
 
     public int getLastReplyingNodeId() {
         return lastReplyingNodeId.get();
-    }
-
-    private final class ThrottledPollerJob implements Runnable
-    {
-
-        private final Runnable runnable;
-        private final long sleepNanos;
-
-        public ThrottledPollerJob(final Runnable runnable, final long sleepNanos)
-        {
-            this.runnable = runnable;
-            this.sleepNanos = sleepNanos;
-        }
-
-        @Override
-        public void run()
-        {
-            while (!clusterClient.isClosed())
-            {
-                runnable.run();
-                LockSupport.parkNanos(sleepNanos);
-            }
-        }
     }
 }
